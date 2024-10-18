@@ -1,11 +1,9 @@
 import numpy as np
 import torch
-from torch import nn
-from torch import optim
-from torch.utils.data import DataLoader
-
-from models.simple_unet import SimpleUNet
 from metrics.segmentation_metric import MaskScoring
+from models.simple_unet import SimpleUNet
+from torch import nn, optim
+from torch.utils.data import DataLoader
 from visualizations.mask_visualization import save_mask_image
 
 
@@ -16,7 +14,7 @@ def run_segmentation(mode: str,
                      net: SimpleUNet,
                      criterion: nn.CrossEntropyLoss,
                      metric: MaskScoring,
-                     optimizer: optim.Optimizer =None):
+                     optimizer: optim.Optimizer = None):
     """セグメンテーションのメインルーチン。1エポックの処理を行う
 
     Args:
@@ -32,7 +30,7 @@ def run_segmentation(mode: str,
 
     if mode == 'train':
         net.train()     # ネットワークを訓練モードに
-    else:   # 'val' or 'test' 
+    else:   # 'val' or 'test'
         net.eval()      # ネットワークを評価モードに
 
     display_interval = len(loader) // 10    # 状態表示するミニバッチの間隔
@@ -58,16 +56,18 @@ def run_segmentation(mode: str,
 
         loss_list.append(loss.item())   # 損失値をリストに追加
 
-        predictions = torch.argmax(logits, dim=1)   # ロジット値（クラス別のスコア）が最大のクラスを予測クラスとする
-        
+        # ロジット値（クラス別のスコア）が最大のクラスを予測クラスとする
+        predictions = torch.argmax(logits, dim=1)
+
         minibatch_tp, minibatch_fp, minibatch_fn = metric(predictions, masks)
         batch_tp += minibatch_tp    # ミニバッチの真陽性ピクセル数を加算
         batch_fp += minibatch_fp    # ミニバッチの偽陽性ピクセル数を加算
         batch_fn += minibatch_fn    # ミニバッチの偽陰性ピクセル数を加算
-        
+
         if batch_idx % display_interval == 0:   # 間隔ごとに状態表示
-            print(f'{mode} [mini-batches: {batch_idx}, images: {batch_idx * loader.batch_size}] loss: {loss.item():.4f}')
-        
+            print(
+                f'{mode} [mini-batches: {batch_idx}, images: {batch_idx * loader.batch_size}] loss: {loss.item():.4f}')
+
         if batch_idx == 1:
             if epoch is not None:
                 file_name = f'results/mnist_segmentation/{mode}_epoch{epoch:02}.png'
@@ -75,11 +75,12 @@ def run_segmentation(mode: str,
                 file_name = f'results/mnist_segmentation/{mode}.png'
 
             # 結果の画像保存
-            save_mask_image(images.detach().to('cpu'), predictions, file_name)
+            save_mask_image(images.detach().to('cpu'),
+                            predictions.detach().to('cpu'), file_name)  # 修正済
 
     loss_mean = np.mean(loss_list)     # エポック内の損失値の平均
 
     dump = f'{mode}  loss: {loss_mean:.4f}  TP: {batch_tp}  FP: {batch_fp}  FN: {batch_fn}\n'
     if epoch is not None:
-        dump = f'Epoch: {epoch}/' + dump    
+        dump = f'Epoch: {epoch}/' + dump
     print(dump)
